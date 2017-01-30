@@ -10,6 +10,7 @@ import sys
 import argparse
 from faker import Faker
 from random import randrange
+import os
 
 #todo:
 # allow writing different patterns (Common Log, Apache Error log etc)
@@ -40,26 +41,35 @@ parser = argparse.ArgumentParser(__file__, description="Fake Apache Log Generato
 parser.add_argument("--output", "-o", dest='output_type', help="Write to a Log file, a gzip file or to STDOUT", choices=['LOG','GZ','CONSOLE'] )
 parser.add_argument("--num", "-n", dest='num_lines', help="Number of lines to generate (0 for infinite)", type=int, default=1)
 parser.add_argument("--prefix", "-p", dest='file_prefix', help="Prefix the output file name", type=str)
+parser.add_argument("--rotate", "-r", dest='rotate_freq', help="Rotate every hour? - 1 to enable, 0 to disable", type=int, default=0)
+parser.add_argument("--offset", "-f", dest="date_offset", help="Offset in days from today - can be negative", type=int, default=0)
 
 args = parser.parse_args()
 
 log_lines = args.num_lines
 file_prefix = args.file_prefix
 output_type = args.output_type
+rotate_freq = args.rotate_freq
+date_offset = datetime.timedelta(days=args.date_offset)
 
 faker = Faker()
 
-timestr = time.strftime("%Y%m%d-%H%M%S")
-otime = datetime.datetime.now()
+
+#timestr = time.strftime("%Y%m%d-%H%M%S")
+otime = datetime.datetime.now() + date_offset
+initial_otime = otime
+timestr = otime.strftime("%Y%m%d-%H%M%S")
 
 outFileName = 'access_log_'+timestr+'.log' if not file_prefix else file_prefix+'_access_log_'+timestr+'.log'
 
 for case in switch(output_type):
 	if case('LOG'):
-		f = open(outFileName,'w')
+		if rotate_freq == 0:
+			f = open(outFileName,'w')
 		break
 	if case('GZ'):
-		f = gzip.open(outFileName+'.gz','w')
+		if rotate_freq == 0:
+			f = gzip.open(outFileName+'.gz','w')
 		break
 	if case('CONSOLE'): pass
 	if case():
@@ -75,12 +85,28 @@ ualist = [faker.firefox, faker.chrome, faker.safari, faker.internet_explorer, fa
 
 flag = True
 while (flag):
-	increment = datetime.timedelta(seconds=random.randint(30,300))
+	increment = datetime.timedelta(seconds=random.randint(30, 50))
 	otime += increment
+	if rotate_freq == 1:
+		try:
+			os.makedirs(otime.strftime("./%Y/%m/%d/%H/"))
+		except:
+			pass
+		outFileName = otime.strftime("./%Y/%m/%d/%H/") + 'access_log.log' if not file_prefix else otime.strftime("./%Y/%m/%d/%H/") + file_prefix + '_access_log.log'
+
+		for case in switch(output_type):
+			if case('LOG'):
+				f = open(outFileName, 'a')
+				break
+			if case('GZ'):
+				f = gzip.open(outFileName + '.gz', 'a')
+				break
+
+
 
 	ip = faker.ipv4()
 	dt = otime.strftime('%d/%b/%Y:%H:%M:%S')
-	tz = datetime.datetime.now(pytz.timezone('US/Pacific')).strftime('%z')
+	tz = datetime.datetime.now(pytz.timezone('Australia/Sydney')).strftime('%z')
 	vrb = numpy.random.choice(verb,p=[0.6,0.1,0.1,0.2])
 
 	uri = random.choice(resources)
@@ -91,7 +117,9 @@ while (flag):
 	byt = int(random.gauss(5000,50))
 	referer = faker.uri()
 	useragent = numpy.random.choice(ualist,p=[0.5,0.3,0.1,0.05,0.05] )()
-	f.write('%s - - [%s %s] "%s %s HTTP/1.0" %s %s "%s" "%s"\n' % (ip,dt,tz,vrb,uri,resp,byt,referer,useragent))
+
+
+	f.write('%s,-,-,[%s %s],"%s %s HTTP/1.0",%s,%s,"%s","%s"\n' % (ip,dt,tz,vrb,uri,resp,byt,referer,useragent))
 
 	log_lines = log_lines - 1
 	flag = False if log_lines == 0 else True
