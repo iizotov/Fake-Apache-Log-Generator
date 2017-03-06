@@ -119,7 +119,7 @@ while (flag):
 	useragent = numpy.random.choice(ualist,p=[0.5,0.3,0.1,0.05,0.05] )()
 
 
-	f.write('%s,-,-,[%s %s],"%s %s HTTP/1.0",%s,%s,"%s","%s"\n' % (ip,dt,tz,vrb,uri,resp,byt,referer,useragent))
+	f.write('%s|-|-|%s %s|%s %s HTTP/1.0|%s|%s|%s|%s\n' % (ip,dt,tz,vrb,uri,resp,byt,referer,useragent))
 
 	log_lines = log_lines - 1
 	flag = False if log_lines == 0 else True
